@@ -1,0 +1,89 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.whispercpp'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        // ndk.abiFilters works as a pre-build constraint, not a post-build cleanup step
+        // AGP will automatically pass the ABI constraint to CMake
+        ndk {
+            abiFilters 'arm64-v8a'
+//            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+        }
+        externalNativeBuild {
+            cmake {
+                // When set, builds whisper.android against the version located
+                // at GGML_HOME instead of the copy bundled with whisper.cpp.
+                if (
+                        project.hasProperty('GGML_HOME') &&
+                                project.findProperty('GGML_CLBLAST') == 'ON'
+                ) {
+                    // Add message for FIRST (CLBlast enabled) branch
+                    logger.lifecycle("=== [CMake Config] Using EXTERNAL GGML (${project.property('GGML_HOME')}) + CLBlast Acceleration ===")
+                    logger.lifecycle("CLBlast Path: ${project.property('CLBLAST_HOME')}")
+                    logger.lifecycle("OpenCL Root: ${project.property('OPENCL_ROOT')}")
+
+                    // Turning on CLBlast requires GGML_HOME
+                    arguments "-DGGML_HOME=${project.property('GGML_HOME')}",
+                            "-DGGML_CLBLAST=ON",
+                            "-DOPENCL_LIB=${project.property('OPENCL_LIB')}",
+                            "-DCLBLAST_HOME=${project.property('CLBLAST_HOME')}",
+                            "-DOPENCL_ROOT=${project.property('OPENCL_ROOT')}",
+                            "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH",
+                            "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH"
+                } else if (project.hasProperty('GGML_HOME')) {
+                    def ggmlPath = project.property('GGML_HOME')
+                    logger.lifecycle("=== [CMake Config] Using EXTERNAL GGML only (path: ${ggmlPath}) - CLBlast is DISABLED ===")
+
+                    arguments "-DGGML_HOME=${project.property('GGML_HOME')}"
+                } else {
+                    // Optional: Add message for when neither condition is met (default behavior)
+                    logger.lifecycle("=== [CMake Config] Using DEFAULT bundled GGML (no external GGML, no CLBlast) ===")
+                }
+
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    //ndkVersion "25.2.9519653"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/jni/whisper/CMakeLists.txt")
+        }
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.8.0'
+
+}
+
